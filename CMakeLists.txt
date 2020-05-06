@@ -18,8 +18,10 @@
 # For conditions of distribution and use, see the disclaimer
 # and license in png.h
 
+if (NOT MOBILE_BUILD)
 cmake_minimum_required(VERSION 3.1)
 cmake_policy(VERSION 3.1)
+endif()
 
 project(libpng C ASM)
 enable_testing()
@@ -36,11 +38,16 @@ include(GNUInstallDirs)
 
 # Allow users to specify location of Zlib.
 # Useful if zlib is being built alongside this as a sub-project.
-option(PNG_BUILD_ZLIB "Custom zlib Location, else find_package is used" OFF)
+option(PNG_BUILD_ZLIB "Custom zlib Location, else find_package is used" ON)
 
 if(NOT PNG_BUILD_ZLIB)
   find_package(ZLIB REQUIRED)
   include_directories(${ZLIB_INCLUDE_DIR})
+else()
+   set(ZLIB_LIBRARY zlib)
+   message("Use zlib ${ZLIB_LIBRARY}")
+   message("Use zlib ${ZLIB_INCLUDE_DIR}")
+   message("Use zlib ${M_LIBRARY}")
 endif()
 
 if(UNIX AND NOT APPLE AND NOT BEOS AND NOT HAIKU)
@@ -51,9 +58,11 @@ else()
 endif()
 
 # COMMAND LINE OPTIONS
-option(PNG_SHARED "Build shared lib" ON)
+option(PNG_SHARED "Build shared lib" OFF)
 option(PNG_STATIC "Build static lib" ON)
-option(PNG_TESTS  "Build libpng tests" ON)
+option(PNG_TESTS  "Build libpng tests" OFF)
+
+option(SKIP_INSTALL_ALL "Skip install all" ON)
 
 # Many more configuration options could be added here
 option(PNG_FRAMEWORK "Build OS X framework" OFF)
@@ -270,12 +279,12 @@ endif()
 
 find_program(AWK NAMES gawk awk)
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
+include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 if(NOT AWK OR ANDROID)
   # No awk available to generate sources; use pre-built pnglibconf.h
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/pnglibconf.h.prebuilt
-                 ${CMAKE_CURRENT_BINARY_DIR}/pnglibconf.h)
+                 ${CMAKE_CURRENT_BINARY_DIR}/include/pnglibconf.h)
   add_custom_target(genfiles) # Dummy
 else()
   include(CMakeParseArguments)
@@ -457,7 +466,9 @@ endif(NOT AWK OR ANDROID)
 set(libpng_public_hdrs
   png.h
   pngconf.h
-  "${CMAKE_CURRENT_BINARY_DIR}/pnglibconf.h"
+  pngstruct.h # A2iA : shouldn't use this struct in png1.6 and further
+  pnginfo.h   # A2iA : shouldn't use this struct in png1.6 and further
+  ${CMAKE_CURRENT_BINARY_DIR}/include/pnglibconf.h
 )
 set(libpng_private_hdrs
   pngpriv.h
@@ -551,27 +562,27 @@ endif()
 
 if(PNG_STATIC)
   # does not work without changing name
-  set(PNG_LIB_NAME_STATIC png_static)
-  add_library(png_static STATIC ${libpng_sources})
-  add_dependencies(png_static genfiles)
+  set(PNG_LIB_NAME_STATIC png)
+  add_library(png STATIC ${libpng_sources})
+  add_dependencies(png genfiles)
   # MSVC doesn't use a different file extension for shared vs. static
   # libs.  We are able to change OUTPUT_NAME to remove the _static
   # for all other platforms.
   if(NOT MSVC)
-    set_target_properties(png_static PROPERTIES
+    set_target_properties(png PROPERTIES
       OUTPUT_NAME "${PNG_LIB_NAME}"
       CLEAN_DIRECT_OUTPUT 1)
   else()
-    set_target_properties(png_static PROPERTIES
+    set_target_properties(png PROPERTIES
       OUTPUT_NAME "${PNG_LIB_NAME}_static"
       CLEAN_DIRECT_OUTPUT 1)
   endif()
-  list(APPEND PNG_LIB_TARGETS png_static)
+  list(APPEND PNG_LIB_TARGETS png)
   if(MSVC)
     # msvc does not append 'lib' - do it here to have consistent name
-    set_target_properties(png_static PROPERTIES PREFIX "lib")
+    set_target_properties(png PROPERTIES PREFIX "lib")
   endif()
-  target_link_libraries(png_static ${ZLIB_LIBRARY} ${M_LIBRARY})
+  target_link_libraries(png ${ZLIB_LIBRARY} ${M_LIBRARY})
 endif()
 
 if(PNG_FRAMEWORK)
@@ -870,12 +881,14 @@ if(NOT SKIP_INSTALL_LIBRARIES AND NOT SKIP_INSTALL_ALL)
 
   if(PNG_STATIC)
     if(NOT WIN32 OR CYGWIN OR MINGW)
-      create_symlink(libpng${CMAKE_STATIC_LIBRARY_SUFFIX} TARGET png_static)
-      install(FILES $<TARGET_LINKER_FILE_DIR:png_static>/libpng${CMAKE_STATIC_LIBRARY_SUFFIX}
+      create_symlink(libpng${CMAKE_STATIC_LIBRARY_SUFFIX} TARGET png)
+      install(FILES $<TARGET_LINKER_FILE_DIR:png>/libpng${CMAKE_STATIC_LIBRARY_SUFFIX}
               DESTINATION ${CMAKE_INSTALL_LIBDIR})
     endif()
   endif()
 endif()
+
+file( COPY ${libpng_public_hdrs} DESTINATION include )
 
 if(NOT SKIP_INSTALL_HEADERS AND NOT SKIP_INSTALL_ALL)
   install(FILES ${libpng_public_hdrs} DESTINATION include)
@@ -929,3 +942,18 @@ endif()
 # to create msvc import lib for mingw compiled shared lib
 # pexports libpng.dll > libpng.def
 # lib /def:libpng.def /machine:x86
+
+create_source_group(${libpng_sources})
+create_source_group(${libpng_public_hdrs} ${libpng_private_hdrs})
+
+ADD_VERSIONKOB(libimg png)
+
+target_include_directories(png INTERFACE 
+   ${CMAKE_CURRENT_BINARY_DIR}/include
+)
+
+EXPORT(
+  TARGETS png
+  APPEND 
+  FILE ${A2IA_Export_OutputDir}/png-exports.cmake
+)
