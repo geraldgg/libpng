@@ -135,7 +135,12 @@
 #  endif
 #endif
 
-#if PNG_ARM_NEON_OPT > 0
+#ifdef IOS_BUILD
+ #define PNG_ARM_NEON_OPT 0
+#endif
+
+#if PNG_ARM_NEON_OPT == 0
+#elif PNG_ARM_NEON_OPT > 0
    /* NEON optimizations are to be at least considered by libpng, so enable the
     * callbacks to do this.
     */

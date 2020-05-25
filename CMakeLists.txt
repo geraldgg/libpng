@@ -18,12 +18,18 @@
 # For conditions of distribution and use, see the disclaimer
 # and license in png.h
 
-if (NOT MOBILE_BUILD)
+if (MSVC)
 cmake_minimum_required(VERSION 3.1)
 cmake_policy(VERSION 3.1)
 endif()
 
+if (NOT APPLE)
 project(libpng C ASM)
+else()
+project(libpng)
+endif()
+MESSAGE(STATUS "libpng")
+
 enable_testing()
 
 set(PNGLIB_MAJOR 1)
@@ -46,8 +52,8 @@ if(NOT PNG_BUILD_ZLIB)
 else()
    set(ZLIB_LIBRARY zlib)
    message("Use zlib ${ZLIB_LIBRARY}")
-   message("Use zlib ${ZLIB_INCLUDE_DIR}")
-   message("Use zlib ${M_LIBRARY}")
+   #message("Use zlib ${ZLIB_INCLUDE_DIR}")
+   #message("Use zlib ${M_LIBRARY}")
 endif()
 
 if(UNIX AND NOT APPLE AND NOT BEOS AND NOT HAIKU)
@@ -71,6 +77,10 @@ option(PNG_HARDWARE_OPTIMIZATIONS "Enable hardware optimizations" ON)
 
 set(PNG_PREFIX "" CACHE STRING "Prefix to add to the API function names")
 set(DFA_XTRA "" CACHE FILEPATH "File containing extra configuration settings")
+
+if (IOS_BUILD)
+set(PNG_HARDWARE_OPTIMIZATIONS OFF)
+endif()
 
 if(PNG_HARDWARE_OPTIMIZATIONS)
 
@@ -206,7 +216,11 @@ endif()
 endif(PNG_HARDWARE_OPTIMIZATIONS)
 
 # SET LIBNAME
-set(PNG_LIB_NAME png${PNGLIB_MAJOR}${PNGLIB_MINOR})
+if (APPLE)
+  set(PNG_LIB_NAME png)
+else()
+  set(PNG_LIB_NAME png${PNGLIB_MAJOR}${PNGLIB_MINOR})
+endif()
 
 # to distinguish between debug and release lib
 set(CMAKE_DEBUG_POSTFIX "d")
@@ -277,16 +291,18 @@ if(UNIX)
   symbol_prefix()
 endif()
 
-find_program(AWK NAMES gawk awk)
+#find_program(AWK NAMES gawk awk)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/include)
 
 if(NOT AWK OR ANDROID)
   # No awk available to generate sources; use pre-built pnglibconf.h
+message(STATUS "Generate pnglibconf in ${CMAKE_CURRENT_BINARY_DIR}/include/pnglibconf.h")
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/scripts/pnglibconf.h.prebuilt
                  ${CMAKE_CURRENT_BINARY_DIR}/include/pnglibconf.h)
   add_custom_target(genfiles) # Dummy
 else()
+message(STATUS "Generate pnglibconf in ${CMAKE_CURRENT_BINARY_DIR}/include/pnglibconf.h")
   include(CMakeParseArguments)
   # Generate .chk from .out with awk
   # generate_chk(INPUT inputfile OUTPUT outputfile [DEPENDS dep1 [dep2...]])
@@ -533,7 +549,7 @@ if(PNG_DEBUG)
 endif()
 
 # NOW BUILD OUR TARGET
-include_directories(${CMAKE_CURRENT_SOURCE_DIR} ${ZLIB_INCLUDE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}) # ${ZLIB_INCLUDE_DIR})
 
 unset(PNG_LIB_TARGETS)
 
