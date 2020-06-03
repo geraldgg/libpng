@@ -56,12 +56,13 @@ else()
    #message("Use zlib ${M_LIBRARY}")
 endif()
 
-if(UNIX AND NOT APPLE AND NOT BEOS AND NOT HAIKU)
+if(UNIX AND NOT APPLE AND NOT BEOS AND NOT HAIKU AND NOT ANDROID_BUILD)
   find_library(M_LIBRARY m)
 else()
   # libm is not needed and/or not available
   set(M_LIBRARY "")
 endif()
+message(STATUS "M_LIBRARY=${M_LIBRARY}")
 
 # COMMAND LINE OPTIONS
 option(PNG_SHARED "Build shared lib" OFF)
